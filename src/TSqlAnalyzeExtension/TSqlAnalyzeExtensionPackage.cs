@@ -37,7 +37,8 @@ namespace TSqlAnalyzeExtension
          /// <summary>
         /// TSqlAnalyzeExtensionPackage GUID string.
         /// </summary>
-        public const string PackageGuidString = "98e76c0f-47b2-42f9-92c6-a54b5097b962";
+        private const string PackageGuidString = "98e76c0f-47b2-42f9-92c6-a54b5097b962";
+
         private DTE2 _dte;
 
         #region Package Members
@@ -52,7 +53,6 @@ namespace TSqlAnalyzeExtension
         protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
         {
             Instance = this;
-            await InitializeAsync(cancellationToken, progress);
 
             await JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
 
@@ -92,52 +92,51 @@ namespace TSqlAnalyzeExtension
                 if (document.Object("TextDocument") is not TextDocument textDocument)
                 {
                     MessageBox.Show("Active document is not a text document.");
+                    return;
                 }
-                else
+
+                // Get the current query text
+                var selection = textDocument.Selection;
+                var queryText = selection.Text;
+                if (string.IsNullOrEmpty(queryText))
                 {
-                    // Get the current query text
-                    var selection = textDocument.Selection;
-                    var queryText = selection.Text;
-                    if (string.IsNullOrEmpty(queryText))
-                    {
-                        // If no selection, get entire document
-                        var editPoint = textDocument.StartPoint.CreateEditPoint();
-                        queryText = editPoint.GetText(textDocument.EndPoint);
-                    }
-
-                    // Save to temporary file
-                    var tempFile = Path.GetRandomFileName() + ".sql";
-                    File.WriteAllText(tempFile, queryText);
-
-                    // Run the analyzer
-                    var startInfo = new ProcessStartInfo
-                    {
-                        FileName = "tsqlanalyze",
-                        Arguments = $"-i \"{tempFile}\"",
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        CreateNoWindow = true
-                    };
-
-                    using (var process = Process.Start(startInfo))
-                    {
-                        var output = process.StandardOutput.ReadToEnd();
-                        process.WaitForExit();
-
-                        // Show results in a new document window
-                        var resultWindow = _dte.ItemOperations.NewFile(
-                            "General\\Text File",
-                            "Analysis Results.txt",
-                            EnvDTE.Constants.vsViewKindTextView);
-
-                        var resultDoc = resultWindow.Document.Object("TextDocument") as TextDocument;
-                        var editPoint = resultDoc.StartPoint.CreateEditPoint();
-                        editPoint.Insert(output);
-                    }
-
-                    // Clean up temp file
-                    File.Delete(tempFile);
+                    // If no selection, get entire document
+                    var editPoint = textDocument.StartPoint.CreateEditPoint();
+                    queryText = editPoint.GetText(textDocument.EndPoint);
                 }
+
+                // Save to temporary file
+                var tempFile = Path.GetRandomFileName() + ".sql";
+                File.WriteAllText(tempFile, queryText);
+
+                // Run the analyzer
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = "tsqlanalyze",
+                    Arguments = $"-i \"{tempFile}\"",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    CreateNoWindow = true
+                };
+
+                using (var process = Process.Start(startInfo))
+                {
+                    var output = process.StandardOutput.ReadToEnd();
+                    process.WaitForExit();
+
+                    // Show results in a new document window
+                    var resultWindow = _dte.ItemOperations.NewFile(
+                        "General\\Text File",
+                        "Analysis Results.txt",
+                        EnvDTE.Constants.vsViewKindTextView);
+
+                    var resultDoc = resultWindow.Document.Object("TextDocument") as TextDocument;
+                    var editPoint = resultDoc.StartPoint.CreateEditPoint();
+                    editPoint.Insert(output);
+                }
+
+                // Clean up temp file
+                File.Delete(tempFile);
             }
             catch (Exception ex)
             {
