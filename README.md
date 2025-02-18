@@ -1,0 +1,1 @@
+# tsqlanalyze-ssms-extension
